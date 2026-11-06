@@ -8,10 +8,14 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "datasets>=5.1.0",
+    "dotenv>=0.9.9",
+    "huggingface-hub>=2.4.0",
     "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "torch>=2.15.0",
     "torchvision>=0.29.2",
+    "transformers>=5.22.1",
 ]
 
 [project.scripts]
