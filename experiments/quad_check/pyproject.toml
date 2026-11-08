@@ -1,0 +1,20 @@
+[project]
+name = "quad-check"
+version = "0.1.0"
+description = "Pilot check: is the LoRA fine-tune local enough for the Fisher-based kappa?"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.15.0",
+    "datasets>=5.1.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "peft",
+    "pytest",
+    "pyyaml",
+    "torch>=2.14.0",
+    "transformers>=5.22.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"

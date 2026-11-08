@@ -1,0 +1,38 @@
+# Full pilot run (Zaratan, 1x A100). See README.md.
+model_id: Qwen/Qwen2.5-0.5B-Instruct
+out_dir: outputs/full
+seed: 0
+
+data:
+  n_sft: null            # null = all 7,473 GSM8K train examples
+  n_new: 200             # GSM8K test prompts for the check
+  n_old: {arc: 70, mmlu: 70, ifeval: 60}
+  n_eval_gsm8k: null     # null = all 1,319 GSM8K test problems
+  n_eval_mc: 500         # per MC benchmark (ARC-Challenge, MMLU non-math)
+
+train:
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  lr: 1.0e-4
+  epochs: 1
+  micro_batch: 16
+  grad_accum: 2          # effective batch 32
+  max_len: 512
+  warmup_frac: 0.05
+  save_fracs: [0.25, 0.5, 0.75, 1.0]
+
+eval:
+  batch_size: 64
+  max_new_tokens: 512
+
+rollouts:
+  batch_size: 64
+  max_new_tokens: 256
+
+check:
+  ts: [0.01, 0.1, 0.25, 0.5, 1.0]
+  eps: [1.0e-2, 1.0e-3]
+  tokens_per_batch: 4096
+  adapters: [final, step_25, step_50, step_75]

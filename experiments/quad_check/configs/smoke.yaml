@@ -1,0 +1,38 @@
+# Tiny end-to-end run for a laptop GPU (or CPU). Same code path as full.yaml.
+model_id: Qwen/Qwen2.5-0.5B-Instruct
+out_dir: outputs/smoke
+seed: 0
+
+data:
+  n_sft: 64
+  n_new: 6
+  n_old: {arc: 2, mmlu: 2, ifeval: 2}
+  n_eval_gsm8k: 8
+  n_eval_mc: 8
+
+train:
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  lr: 1.0e-4
+  epochs: 1
+  micro_batch: 4
+  grad_accum: 2
+  max_len: 512
+  warmup_frac: 0.05
+  save_fracs: [0.5, 1.0]
+
+eval:
+  batch_size: 8
+  max_new_tokens: 128
+
+rollouts:
+  batch_size: 6
+  max_new_tokens: 48
+
+check:
+  ts: [0.01, 0.1, 0.25, 0.5, 1.0]
+  eps: [1.0e-2, 1.0e-3]
+  tokens_per_batch: 1024
+  adapters: [final, step_50]
