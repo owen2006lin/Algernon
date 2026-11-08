@@ -228,7 +228,6 @@ def forward_kl_batch(pi_0, pi, batch):
         return torch.sum(kl)
 
 def forward_kl(pi_0, pi, parity_loader):
-    device = next(pi_0.parameters()).device
     kl = 0
     for _, (batch, _) in enumerate(parity_loader):
         batch_kl = forward_kl_batch(pi_0, pi, batch)
@@ -241,14 +240,6 @@ def forward_kl(pi_0, pi, parity_loader):
 
 #==========================================SFT Supervised Fine Tuning==================================#
 
-pi_1 = MLP()
-pi_1.load_state_dict(pi_0.state_dict())
-pi_1.to(device)
-
-pi_2 = MLP()
-pi_2.load_state_dict(pi_0.state_dict())
-pi_2.to(device)
-
 def sft1_targets(y):
     return y % 2
 
@@ -256,20 +247,20 @@ def sft2_targets(y):
     c = torch.randint(0, 2, y.shape, device = y.device)
     return y % 2 + 4 * c 
 
-def train_sft(model, n_epochs, loader, labeling, path):
-    optimizer = torch.optim.SGD(model.parameters(), lr = 0.01, momentum = 0.9)
-    
+def train_sft(model, scheduler, loader, optimizer, labeling, n_epochs, path):    
     best_acc = -9999999
     epoch_number = 0
     for epoch in range(n_epochs):
         epoch_loss = 0
         for x, y in loader:
             x, y = x.to(device), y.to(device)
+
             optimizer.zero_grad()
             loss = F.cross_entropy(model(x), labeling(y))
 
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             epoch_loss += loss.item()
         epoch_loss /= len(loader)
@@ -302,10 +293,6 @@ def make_scheduler(optimizer, warmup_steps, total_steps, kind="constant"):
     return LambdaLR(optimizer, lr_factor)
 
 #==========================================GRPO Reinforcement Learning================================#
-
-pi_rl = MLP()
-pi_rl.load_state_dict(pi_0.state_dict())
-pi_rl.to(device)
 
 def train_grpo(model, n_epochs, loader, path, G = 10, lr = 1e-3):
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
@@ -341,6 +328,8 @@ def train_grpo(model, n_epochs, loader, path, G = 10, lr = 1e-3):
 
 #=========================================Full pipeline + Hyperparameter Sweeps======================================#
 import numpy as np
+import copy
+
 learning_rates = np.geomspace(3e-6, 1e-3, 15)
 epochs = [1,2]
 
@@ -349,26 +338,41 @@ model = MLP().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-3)
 loss_fn = torch.nn.CrossEntropyLoss()
 
-train(model, optimizer, loss_fn, pretrain_loader, 20, path = "models/mlp1")
+#train(model, optimizer, loss_fn, pretrain_loader, 20, path = "models/mlp1")
 # Initial distribution
 pi_0 = MLP().to(device)
 pi_0.load_state_dict(torch.load("models/mlp1", map_location = device, weights_only = True))
 
 
 
+#===================================================Starter Sweep=====================================#
+learning_rates = np.geomspace(1e-5, 1e-3, 6)
 
+# SFT 1
 
-
-def make_single_sweep(loader, n_epochs, lr):
-    model = MLP().to(device)
+for lr in learning_rates:
+    model = copy.deepcopy(pi_0)
+    loader = DataLoader(finetune_data, batch_size = 64, shuffle = True)
+    
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
-    total_steps = n_epochs * len(loader)
+    total_steps = len(finetune_loader)
 
     scheduler = make_scheduler(optimizer, warmup_steps=50,
-                           total_steps=total_steps, kind="cosine")
+                            total_steps=total_steps, kind="constant")
+
+    train_sft(model, scheduler, loader, optimizer, sft1_targets, 1, f"models/starter_sweep/sft_1_{lr}")
 
 
+print("Pre-trained model parity accuracy: ")
+print(evaluate(pi_0, parity_test_loader, parity = True))
 
+print("Pre-trained model fashion accuracy: ")
+print(evaluate(pi_0, fashion_test_loader, parity = False))
+for lr in learning_rates:
+    model = MLP().to(device)
+    model.load_state_dict(torch.load(f"models/starter_sweep/sft_1_{lr}", map_location = device, weights_only = True))
+    print(f"Model lr = {lr} forgetting")
+    print(forgetting(model, pi_0, fashion_test_loader))
 
 
 
